@@ -415,6 +415,73 @@
       line-height: 1.65;
     }
 
+    .result-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .secondary-button {
+      min-height: 54px;
+      padding: 0 20px;
+      border: 1px solid rgba(211, 169, 255, .38);
+      border-radius: 16px;
+      background: rgba(211,169,255,.13);
+      color: #f1e8ff;
+      cursor: pointer;
+      font-size: .95rem;
+      font-weight: 800;
+      transition: background .16s ease, transform .16s ease;
+    }
+
+    .secondary-button:hover {
+      transform: translateY(-2px);
+      background: rgba(211,169,255,.23);
+    }
+
+    .review-intro {
+      max-width: 500px;
+      margin-bottom: 22px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .review-list {
+      display: grid;
+      gap: 12px;
+      margin: 0 0 24px;
+      padding: 0;
+      list-style: none;
+    }
+
+    .review-item {
+      padding: 17px;
+      border: 1px solid rgba(203, 202, 241, .2);
+      border-radius: 16px;
+      background: rgba(255,255,255,.045);
+    }
+
+    .review-item h3 {
+      margin: 0 0 10px;
+      font-size: 1rem;
+      line-height: 1.45;
+    }
+
+    .review-answer {
+      margin: 0 0 8px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .review-status {
+      margin: 0;
+      font-size: .85rem;
+      font-weight: 800;
+    }
+
+    .review-status.correct { color: #8bf0bb; }
+    .review-status.incorrect { color: #ff9aaf; }
+
     .sr-only {
       position: absolute;
       width: 1px;
@@ -447,6 +514,7 @@
       .answer { min-height: 57px; }
       .progress-track { margin-bottom: 28px; }
       .feedback-row { align-items: flex-start; }
+      .result-actions { flex-direction: column; align-items: stretch; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -502,7 +570,18 @@
         <h2 id="results-title">You made it around the sun!</h2>
         <p class="result-score" id="final-score"></p>
         <p class="result-copy" id="result-copy"></p>
-        <button class="primary-button" id="restart-button" type="button">Explore again <span aria-hidden="true">↻</span></button>
+        <div class="result-actions">
+          <button class="primary-button" id="restart-button" type="button">Explore again <span aria-hidden="true">↻</span></button>
+          <button class="secondary-button" id="review-button" type="button">Review answers</button>
+        </div>
+      </div>
+
+      <div class="screen" id="review-screen" aria-labelledby="review-title" hidden>
+        <p class="eyebrow">Mission review</p>
+        <h2 id="review-title" tabindex="-1">Your answers</h2>
+        <p class="review-intro">Here’s what you chose for each question.</p>
+        <ol class="review-list" id="review-list"></ol>
+        <button class="secondary-button" id="back-to-results-button" type="button">Back to results</button>
       </div>
       <p class="sr-only" id="screen-announcement" role="status" aria-live="polite"></p>
     </section>
@@ -585,6 +664,7 @@
     const welcomeScreen = document.getElementById("welcome-screen");
     const quizScreen = document.getElementById("quiz-screen");
     const resultsScreen = document.getElementById("results-screen");
+    const reviewScreen = document.getElementById("review-screen");
     const questionCount = document.getElementById("question-count");
     const scoreDisplay = document.getElementById("score");
     const progressTrack = document.getElementById("progress-track");
@@ -595,19 +675,26 @@
     const feedback = document.getElementById("feedback");
     const nextButton = document.getElementById("next-button");
     const screenAnnouncement = document.getElementById("screen-announcement");
+    const reviewButton = document.getElementById("review-button");
+    const reviewList = document.getElementById("review-list");
+    const reviewTitle = document.getElementById("review-title");
+    const backToResultsButton = document.getElementById("back-to-results-button");
     let currentQuestion = 0;
     let score = 0;
     let hasAnswered = false;
+    let selectedAnswers = [];
 
     function showScreen(screen) {
       welcomeScreen.hidden = screen !== "welcome";
       quizScreen.hidden = screen !== "quiz";
       resultsScreen.hidden = screen !== "results";
+      reviewScreen.hidden = screen !== "review";
     }
 
     function startQuiz() {
       currentQuestion = 0;
       score = 0;
+      selectedAnswers = [];
       scoreDisplay.textContent = score;
       showScreen("quiz");
       renderQuestion();
@@ -652,6 +739,7 @@
       if (hasAnswered) return;
       hasAnswered = true;
       const item = questions[currentQuestion];
+      selectedAnswers[currentQuestion] = selectedIndex;
       const buttons = answersContainer.querySelectorAll(".answer");
       buttons.forEach(button => { button.disabled = true; });
       const isCorrect = selectedIndex === item.correct;
@@ -695,8 +783,40 @@
       document.getElementById("restart-button").focus();
     }
 
+    function showReview() {
+      reviewList.replaceChildren();
+      questions.forEach((item, index) => {
+        const selectedIndex = selectedAnswers[index];
+        const isCorrect = selectedIndex === item.correct;
+        const entry = document.createElement("li");
+        entry.className = "review-item";
+
+        const question = document.createElement("h3");
+        question.textContent = `${index + 1}. ${item.question}`;
+        const answer = document.createElement("p");
+        answer.className = "review-answer";
+        answer.textContent = `Your answer: ${item.answers[selectedIndex]}`;
+        const status = document.createElement("p");
+        status.className = `review-status ${isCorrect ? "correct" : "incorrect"}`;
+        status.textContent = isCorrect ? "Correct" : "Incorrect";
+
+        entry.append(question, answer, status);
+        reviewList.append(entry);
+      });
+
+      showScreen("review");
+      screenAnnouncement.textContent = `Answer review. ${questions.length} questions and your selected answers.`;
+      reviewTitle.focus();
+    }
+
     document.getElementById("start-button").addEventListener("click", startQuiz);
     document.getElementById("restart-button").addEventListener("click", startQuiz);
+    reviewButton.addEventListener("click", showReview);
+    backToResultsButton.addEventListener("click", () => {
+      showScreen("results");
+      screenAnnouncement.textContent = "Back to your quiz results.";
+      reviewButton.focus();
+    });
     nextButton.addEventListener("click", () => {
       currentQuestion += 1;
       if (currentQuestion === questions.length) showResults();
